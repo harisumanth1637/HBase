@@ -1,6 +1,7 @@
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
@@ -19,12 +20,18 @@ import org.apache.hadoop.util.ToolRunner;
 public class InsertData extends Configured implements Tool {
 
     public static String Table_Name = "CovidData";
+    
+    // Define the input date format expected from the dataset
+    private static SimpleDateFormat inputDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    
+    // Define the output format for the row key
+    private static SimpleDateFormat outputDateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
 
     @Override
     public int run(String[] args) throws IOException {
         Configuration conf = HBaseConfiguration.create();
         HBaseAdmin admin = new HBaseAdmin(conf);
-        
+
         // Check if the table exists, if not, create it
         if (!admin.tableExists(Table_Name)) {
             HTableDescriptor hTableDescriptor = new HTableDescriptor(Table_Name);
@@ -34,8 +41,6 @@ public class InsertData extends Configured implements Tool {
             admin.createTable(hTableDescriptor);
             System.out.println("Table created successfully.");
         }
-
-        HTable hTable = new HTable(conf, Table_Name);
 
         int row_count = 0;
 
@@ -61,17 +66,35 @@ public class InsertData extends Configured implements Tool {
                 String user_verified = data[7];
                 String date = data[8];
                 String tweet_text = data[9];
-                String hashtags = data[10]; 
+                String hashtags = data[10];  // This could be empty, handle as null
                 String source = data[11];
                 String is_retweet = data[12];
 
-                // Creating a unique row key using user_name and the date to ensure uniqueness
-                // Parse and format the date to yyyyMMddHHmmss for the row key
-                String formattedDate = formatDate(date);
-                if (formattedDate == null) continue;  
+                // Check if both user_name and date are empty, then skip the row
+                if (isNullOrEmpty(user_name) && isNullOrEmpty(date)) {
+                    continue;  // Skip row if both are empty
+                }
 
-                // Create a unique row key using user_name and the formatted date
-                String row_key = user_name + "_" + formattedDate;
+                // Parse and format the date to yyyyMMddHHmmss for the row key
+                String formattedDate = null;
+                if (!isNullOrEmpty(date)) {
+                    try {
+                        Date parsedDate = inputDateFormat.parse(date);  // Parse date from the CSV
+                        formattedDate = outputDateFormat.format(parsedDate);  // Format for the row key
+                    } catch (ParseException e) {
+                        // If date parsing fails, we simply use the username without the date
+                        formattedDate = null;
+                    }
+                }
+
+                // Create a unique row key using user_name and the formatted date if available
+                String row_key;
+                if (formattedDate != null) {
+                    row_key = user_name + "_" + formattedDate;  // Use both user_name and date
+                } else {
+                    row_key = user_name;  // Use only user_name if date is invalid or empty
+                }
+
                 Put put = new Put(Bytes.toBytes(row_key));
 
                 // Insert into Users family
@@ -116,8 +139,12 @@ public class InsertData extends Configured implements Tool {
                     put.add(Bytes.toBytes("Extra"), Bytes.toBytes("date"), Bytes.toBytes(date));
                 }
 
-                // Put the data into the table
-                hTable.put(put);
+                // Use try-finally to ensure HTable is closed properly
+                try (HTable hTable = new HTable(conf, Table_Name)) {
+                    hTable.put(put);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
 
                 // Increment row count
                 row_count++;
@@ -125,9 +152,6 @@ public class InsertData extends Configured implements Tool {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-        // Close the table connection
-        hTable.close();
 
         // Print the number of rows inserted
         System.out.println("Inserted " + row_count + " rows.");
