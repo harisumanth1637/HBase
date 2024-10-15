@@ -13,7 +13,7 @@ import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.util.Bytes;
 
-public class TwitterDataInsert {
+public class InsertData {
 
     public static String Table_Name = "TwitterData";
     
