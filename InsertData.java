@@ -1,10 +1,6 @@
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -20,12 +16,6 @@ import org.apache.hadoop.util.ToolRunner;
 public class InsertData extends Configured implements Tool {
 
     public static String Table_Name = "CovidData";
-    
-    // Define the input date format expected from the dataset
-    private static SimpleDateFormat inputDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-    
-    // Define the output format for the row key
-    private static SimpleDateFormat outputDateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
 
     @Override
     public int run(String[] args) throws IOException {
@@ -75,24 +65,14 @@ public class InsertData extends Configured implements Tool {
                     continue;  // Skip row if both are empty
                 }
 
-                // Parse and format the date to yyyyMMddHHmmss for the row key
-                String formattedDate = null;
-                if (!isNullOrEmpty(date)) {
-                    try {
-                        Date parsedDate = inputDateFormat.parse(date);  // Parse date from the CSV
-                        formattedDate = outputDateFormat.format(parsedDate);  // Format for the row key
-                    } catch (ParseException e) {
-                        // If date parsing fails, we simply use the username without the date
-                        formattedDate = null;
-                    }
-                }
-
-                // Create a unique row key using user_name and the formatted date if available
+                // Create a unique row key using user_name and the date (without formatting)
                 String row_key;
-                if (formattedDate != null) {
-                    row_key = user_name + "_" + formattedDate;  // Use both user_name and date
+                if (!isNullOrEmpty(user_name) && !isNullOrEmpty(date)) {
+                    row_key = user_name + "_" + date;  // Concatenate user_name and date directly
+                } else if (!isNullOrEmpty(user_name)) {
+                    row_key = user_name;  // Fallback to just username if date is missing
                 } else {
-                    row_key = user_name;  // Use only user_name if date is invalid or empty
+                    row_key = date;  // Fallback to just date if username is missing
                 }
 
                 Put put = new Put(Bytes.toBytes(row_key));
