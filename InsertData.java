@@ -156,7 +156,7 @@ public class InsertData extends Configured implements Tool {
     }
 
     public static void main(String[] argv) throws Exception {
-        int ret = ToolRunner.run(new InsertDataToHBase(), argv);
+        int ret = ToolRunner.run(new InsertData(), argv);
         System.exit(ret);
     }
 }
