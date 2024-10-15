@@ -113,7 +113,7 @@ public class InsertData {
         // Close resources
         hTable.close();
         br.close();
-        System.out.println("Data inserted successfully.");
+        System.out.println("Inserted " + row_count + " Inserted");
     }
 
     // Helper method to check if a string is null or empty
