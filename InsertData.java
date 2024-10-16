@@ -1,6 +1,6 @@
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -13,6 +13,9 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
+import java.io.FileReader;
+import java.io.IOException;
+
 public class InsertData extends Configured implements Tool {
 
     public static String Table_Name = "CovidData";
@@ -20,12 +23,15 @@ public class InsertData extends Configured implements Tool {
     @Override
     public int run(String[] args) throws IOException {
         Configuration conf = HBaseConfiguration.create();
+        @SuppressWarnings("resource")
         HBaseAdmin admin = new HBaseAdmin(conf);
 
         // Check if the table exists, if not, create it
         if (!admin.tableExists(Table_Name)) {
             HTableDescriptor hTableDescriptor = new HTableDescriptor(Table_Name);
-            hTableDescriptor.addFamily(new HColumnDescriptor("Users"));
+            HColumnDescriptor usersColumnFamily = new HColumnDescriptor("Users");
+            usersColumnFamily.setMaxVersions(4);  // Allow versioning with max 4 versions
+            hTableDescriptor.addFamily(usersColumnFamily);
             hTableDescriptor.addFamily(new HColumnDescriptor("Tweets"));
             hTableDescriptor.addFamily(new HColumnDescriptor("Extra"));
             admin.createTable(hTableDescriptor);
@@ -33,30 +39,18 @@ public class InsertData extends Configured implements Tool {
         }
 
         int row_count = 0;
+        String csvFilePath = "covid19_tweets.csv";  // Path to your CSV file
 
-        try (BufferedReader br = new BufferedReader(new FileReader("top_covid19_tweets.csv"))) {
-            StringBuilder currentLine = new StringBuilder();
-            String line;
+        // Using Apache Commons CSV for parsing
+        try (FileReader reader = new FileReader(csvFilePath);
+             CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrim())) {
 
-            // Assuming the first line is the header, skip it
-            br.readLine();
-
-            while ((line = br.readLine()) != null) {
-                // Append line to currentLine buffer
-                currentLine.append(line);
-
-                // Parse the line (handling multiline fields)
-                String[] data = parseCSVLine(currentLine.toString());
-
-                // Ensure there are 13 fields
-                if (data.length == 13) {
-                    processLine(data, conf);
-                    currentLine.setLength(0);  // Clear buffer for the next record
-                } else {
-                    // If less than 13 fields, continue appending to handle multiline fields
-                    currentLine.append("\n");
-                }
+            for (CSVRecord csvRecord : csvParser) {
+                // Process each CSV record
+                processLine(csvRecord, conf);
+                row_count++;
             }
+
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -67,36 +61,25 @@ public class InsertData extends Configured implements Tool {
         return 0;
     }
 
-    // Helper method to parse a CSV line while handling commas in quotes and newlines inside fields
-    private static String[] parseCSVLine(String line) {
-        // Use regex to split by commas but ignore commas inside quotes
-        return line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1);  // Split by commas while ignoring commas inside quotes
-    }
-
-    // Process each line, print and insert data into HBase
-    private static void processLine(String[] data, Configuration conf) throws IOException {
-        // Clean and trim each field to remove unwanted whitespace
-        for (int i = 0; i < data.length; i++) {
-            data[i] = data[i].replace("\n", " ").replace("\r", " ").trim();
-        }
-
-        // Extract data from the line
-        String user_name = data[0].isEmpty() ? "" : data[0];
-        String user_location = data[1].isEmpty() ? "" : data[1];
-        String user_description = data[2].isEmpty() ? "" : data[2];
-        String user_created = data[3].isEmpty() ? "" : data[3];
-        String user_followers = data[4].isEmpty() ? "" : data[4];
-        String user_friends = data[5].isEmpty() ? "" : data[5];
-        String user_favourites = data[6].isEmpty() ? "" : data[6];
-        String user_verified = data[7].isEmpty() ? "" : data[7];
-        String date = data[8].isEmpty() ? "" : data[8];
-        String tweet_text = data[9].isEmpty() ? "" : data[9];
-        String hashtags = data[10].isEmpty() ? "" : data[10];
-        String source = data[11].isEmpty() ? "" : data[11];
-        String is_retweet = data[12].isEmpty() ? "" : data[12];
+    // Process each CSV record and insert data into HBase
+    private static void processLine(CSVRecord record, Configuration conf) throws IOException {
+        // Extract data from the record
+        String user_name = record.get("user_name");
+        String user_location = record.get("user_location");
+        String user_description = record.get("user_description");
+        String user_created = record.get("user_created");
+        String user_followers = record.get("user_followers");
+        String user_friends = record.get("user_friends");
+        String user_favourites = record.get("user_favourites");
+        String user_verified = record.get("user_verified");
+        String date = record.get("date");
+        String tweet_text = record.get("text");
+        String hashtags = record.get("hashtags");
+        String source = record.get("source");
+        String is_retweet = record.get("is_retweet");
 
         // Skip row if username is missing and print a message
-        if (user_name.isEmpty()) {
+        if (user_name == null || user_name.isEmpty()) {
             System.out.println("Skipping row due to missing username.");
             return;  // Skip the row
         }
@@ -139,11 +122,6 @@ public class InsertData extends Configured implements Tool {
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    // Helper method to check if a string is null or empty
-    private static boolean isNullOrEmpty(String value) {
-        return value == null || value.isEmpty();
     }
 
     // Helper method to convert strings to integers with default value of 0
