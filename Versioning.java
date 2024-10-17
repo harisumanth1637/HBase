@@ -18,8 +18,9 @@ public class Versioning {
         @SuppressWarnings({ "resource" })
         HTable hTable = new HTable(conf, Table_Name);
         
-        String row_key = "user123";  
-
+        String row_key = "APN_NEWS_2020-07-25_12:25:35";  
+        
+        
         // Insert multiple descriptions for the same user
         insertUserDescription(hTable, row_key, "User description version 1");
         insertUserDescription(hTable, row_key, "User description version 2");
