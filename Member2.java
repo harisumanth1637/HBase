@@ -1,6 +1,11 @@
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTable;
@@ -68,49 +73,57 @@ public class Member2 {
 
     // Task b: Select the influential users who have more than 10,000 followers and are verified
     private static void selectInfluentialUsers(HTable hTable) throws IOException {
-        Set<String> uniqueInfluentialUsers = new HashSet<>();
+        Map<String, Integer> influentialUsers = new HashMap<>();  // Use Map to store usernames and their followers count
+        Set<String> seenUsernames = new HashSet<>(); // Track already seen usernames to prevent duplicates
         Scan scan = new Scan();
-        scan.addFamily(Bytes.toBytes("Users"));  // For user_verified and user_followers
-        scan.addFamily(Bytes.toBytes("Extra"));  // For followers count
-        ResultScanner scanner = hTable.getScanner(scan);
+        scan.addFamily(Bytes.toBytes("Users"));  // Add Users family
+        scan.addFamily(Bytes.toBytes("Extra"));  // Add Extra family
 
+        ResultScanner scanner = hTable.getScanner(scan);
         try {
             for (Result result : scanner) {
-                String userName = Bytes.toString(result.getValue(Bytes.toBytes("Users"), Bytes.toBytes("user_name")));
+                // Extract the user_verified and user_followers
                 String userVerified = Bytes.toString(result.getValue(Bytes.toBytes("Users"), Bytes.toBytes("user_verified")));
                 String userFollowersStr = Bytes.toString(result.getValue(Bytes.toBytes("Extra"), Bytes.toBytes("user_followers")));
 
-                // Skip if user is not verified or if followers data is invalid
-                if (!"TRUE".equalsIgnoreCase(userVerified) || userFollowersStr == null || userFollowersStr.isEmpty()) {
-                    continue;
+                // Skip if either user_verified or user_followers is missing
+                if (userVerified == null || userFollowersStr == null) {
+                    continue;  // Skip this row if required fields are missing
                 }
 
+                // Convert followers to integer
                 int userFollowers;
                 try {
-                    userFollowers = Integer.parseInt(userFollowersStr);
+                    userFollowers = Integer.parseInt(userFollowersStr);  // Parse followers count
                 } catch (NumberFormatException e) {
-                    continue; // Skip if followers count is not a valid number
+                    continue;  // Skip this row if followers count is not a valid number
                 }
 
-                // Add to influential users if followers > 10,000
-                if (userFollowers > 10,000) {
-                    uniqueInfluentialUsers.add(userName);
+                // Check if user is verified and has more than 10,000 followers
+                if ("TRUE".equalsIgnoreCase(userVerified) && userFollowers > 10000) {
+                    String userName = Bytes.toString(result.getValue(Bytes.toBytes("Users"), Bytes.toBytes("user_name")));
+                    if (userName != null && !seenUsernames.contains(userName)) {
+                        seenUsernames.add(userName);  // Ensure no duplicates
+                        influentialUsers.put(userName, userFollowers);  // Add to the map with followers count
+                    }
                 }
             }
         } finally {
             scanner.close();
         }
 
-        // Write the influential users to a file
+        // Write the influential users and their follower counts to a file
         try (BufferedWriter writer = new BufferedWriter(new FileWriter("selectInfluentialUsers.txt"))) {
-            writer.write("Influential Verified Users with >10,000 Followers:");
+            writer.write("Influential Users with more than 10,000 followers and verified:");
             writer.newLine();
-            for (String user : uniqueInfluentialUsers) {
-                writer.write(user);
+
+            for (Map.Entry<String, Integer> entry : influentialUsers.entrySet()) {
+                writer.write("Username: " + entry.getKey() + ", Followers: " + entry.getValue());
                 writer.newLine();
             }
         }
 
-        System.out.println("Task b: Influential users written to file 'selectInfluentialUsers.txt'");
+        System.out.println("Task b: Influential users written to 'selectInfluentialUsers.txt'");
     }
+
 }
