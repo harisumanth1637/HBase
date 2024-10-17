@@ -39,9 +39,8 @@ public class InsertData extends Configured implements Tool {
         }
 
         int row_count = 0;
-        String csvFilePath = "covid19_tweets.csv";  // Path to your CSV file
+        String csvFilePath = "covid19_tweets.csv";  
 
-        // Using Apache Commons CSV for parsing
         try (FileReader reader = new FileReader(csvFilePath);
              CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrim())) {
 
@@ -84,10 +83,7 @@ public class InsertData extends Configured implements Tool {
             return;  // Skip the row
         }
 
-        // Convert user_followers, user_friends, and user_favourites to integers, default to 0 if invalid
-        int followers_count = convertToInt(user_followers);
-        int friends_count = convertToInt(user_friends);
-        int favourites_count = convertToInt(user_favourites);
+
 
         // Create a unique row key using user_name and the date (even if the date is empty)
         String row_key = user_name + "_" + date;
@@ -103,9 +99,9 @@ public class InsertData extends Configured implements Tool {
             put.add(Bytes.toBytes("Users"), Bytes.toBytes("user_created"), Bytes.toBytes(user_created));
 
             // Insert the integer values into Extra family
-            put.add(Bytes.toBytes("Extra"), Bytes.toBytes("user_followers"), Bytes.toBytes(followers_count));
-            put.add(Bytes.toBytes("Extra"), Bytes.toBytes("user_friends"), Bytes.toBytes(friends_count));
-            put.add(Bytes.toBytes("Extra"), Bytes.toBytes("user_favourites"), Bytes.toBytes(favourites_count));
+            put.add(Bytes.toBytes("Extra"), Bytes.toBytes("user_followers"), Bytes.toBytes(user_followers));
+            put.add(Bytes.toBytes("Extra"), Bytes.toBytes("user_friends"), Bytes.toBytes(user_friends));
+            put.add(Bytes.toBytes("Extra"), Bytes.toBytes("user_favourites"), Bytes.toBytes(user_favourites));
 
             // Insert into Tweets family
             put.add(Bytes.toBytes("Tweets"), Bytes.toBytes("text"), Bytes.toBytes(tweet_text));
@@ -118,7 +114,7 @@ public class InsertData extends Configured implements Tool {
             put.add(Bytes.toBytes("Extra"), Bytes.toBytes("date"), Bytes.toBytes(date));
 
             hTable.put(put);
-            System.out.println("Inserted row with key: " + row_key);
+            
         } catch (IOException e) {
             e.printStackTrace();
         }
