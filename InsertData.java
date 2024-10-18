@@ -97,6 +97,7 @@ public class InsertData extends Configured implements Tool {
             put.add(Bytes.toBytes("Users"), Bytes.toBytes("user_name"), Bytes.toBytes(user_name));
             put.add(Bytes.toBytes("Users"), Bytes.toBytes("user_verified"), Bytes.toBytes(user_verified));
             put.add(Bytes.toBytes("Users"), Bytes.toBytes("user_created"), Bytes.toBytes(user_created));
+            put.add(Bytes.toBytes("Users"), Bytes.toBytes("user_description"), Bytes.toBytes(user_description));
 
             // Insert the integer values into Extra family
             put.add(Bytes.toBytes("Extra"), Bytes.toBytes("user_followers"), Bytes.toBytes(user_followers));
